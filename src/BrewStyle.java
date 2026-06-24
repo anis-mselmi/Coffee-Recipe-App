@@ -25,4 +25,9 @@ public enum BrewStyle {
     public double getDefaultWaterPerCupMl() {
         return defaultWaterPerCupMl;
     }
+
+    @Override
+    public String toString() {
+        return label;
+    }
 }

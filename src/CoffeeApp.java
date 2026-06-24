@@ -9,37 +9,46 @@ import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.Dimension;
+import java.text.DecimalFormat;
 
 public class CoffeeApp {
     private final RecipeCalculator calculator = new RecipeCalculator();
+    private final DecimalFormat numberFormat = new DecimalFormat("0.0#");
 
-    private final JFrame frame = new JFrame("Simple Coffee Ratios App");
+    private final JFrame frame = new JFrame("Coffee Ratio Calculator");
     private final JComboBox<BrewStyle> styleBox = new JComboBox<>(BrewStyle.values());
     private final JRadioButton cupsMode = new JRadioButton("Calculate by cups", true);
     private final JRadioButton beansMode = new JRadioButton("Calculate by beans");
-    private final JTextField amountField = new JTextField(12);
+    private final JSpinner amountSpinner = new JSpinner(new SpinnerNumberModel(1.0, 0.1, 1000.0, 0.1));
     private final JLabel amountLabel = new JLabel("Cups:");
     private final JTextArea resultArea = new JTextArea(8, 28);
+    private final JButton calculateButton = new JButton("Calculate");
+    private final JButton clearButton = new JButton("Clear");
 
     public void show() {
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(520, 360);
-        frame.setLocationRelativeTo(null);
+        frame.setMinimumSize(new Dimension(560, 420));
         frame.setLayout(new BorderLayout());
+        amountSpinner.setEditor(new JSpinner.NumberEditor(amountSpinner, "0.0#"));
 
         frame.add(buildHeader(), BorderLayout.NORTH);
         frame.add(buildForm(), BorderLayout.CENTER);
         frame.add(buildResultPanel(), BorderLayout.SOUTH);
 
         updateAmountLabel();
+        frame.getRootPane().setDefaultButton(calculateButton);
+        frame.pack();
+        frame.setLocationRelativeTo(null);
         frame.setVisible(true);
     }
 
@@ -48,11 +57,11 @@ public class CoffeeApp {
         header.setBorder(new EmptyBorder(16, 16, 8, 16));
         header.setBackground(new Color(245, 240, 232));
 
-        JLabel title = new JLabel("Simple Coffee Ratios App");
+        JLabel title = new JLabel("Coffee Ratio Calculator");
         title.setFont(new Font("SansSerif", Font.BOLD, 22));
         title.setForeground(new Color(61, 43, 31));
 
-        JLabel subtitle = new JLabel("Choose a brew style and calculate water / coffee instantly.");
+        JLabel subtitle = new JLabel("Pick a brew style, enter your amount, and get a clean recipe summary.");
         subtitle.setForeground(new Color(98, 80, 63));
 
         header.add(title, BorderLayout.NORTH);
@@ -96,14 +105,18 @@ public class CoffeeApp {
         panel.add(amountLabel, c);
 
         c.gridx = 1;
-        panel.add(amountField, c);
+        panel.add(amountSpinner, c);
 
-        JButton calculateButton = new JButton("Calculate");
         calculateButton.addActionListener(e -> calculateRecipe());
+        clearButton.addActionListener(e -> clearForm());
 
         c.gridx = 1;
         c.gridy = 3;
-        panel.add(calculateButton, c);
+        JPanel actionPanel = new JPanel();
+        actionPanel.setBackground(Color.WHITE);
+        actionPanel.add(calculateButton);
+        actionPanel.add(clearButton);
+        panel.add(actionPanel, c);
 
         cupsMode.addActionListener(e -> updateAmountLabel());
         beansMode.addActionListener(e -> updateAmountLabel());
@@ -121,7 +134,7 @@ public class CoffeeApp {
         resultArea.setWrapStyleWord(true);
         resultArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
         resultArea.setBorder(BorderFactory.createTitledBorder("Result"));
-        resultArea.setText("Enter your values and press Calculate.");
+        resultArea.setText("Select a brew style and enter a value to see the recipe.");
 
         panel.add(new JScrollPane(resultArea), BorderLayout.CENTER);
         return panel;
@@ -130,10 +143,10 @@ public class CoffeeApp {
     private void updateAmountLabel() {
         if (cupsMode.isSelected()) {
             amountLabel.setText("Cups:");
-            amountField.setToolTipText("Enter the number of cups you want to brew");
+            amountSpinner.setToolTipText("Enter the number of cups you want to brew");
         } else {
             amountLabel.setText("Beans (g):");
-            amountField.setToolTipText("Enter the grams of coffee beans you have");
+            amountSpinner.setToolTipText("Enter the grams of coffee beans you have");
         }
     }
 
@@ -143,14 +156,7 @@ public class CoffeeApp {
             return;
         }
 
-        double amount;
-        try {
-            amount = Double.parseDouble(amountField.getText().trim());
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(frame, "Please enter a valid number.", "Invalid Input", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
+        double amount = ((Number) amountSpinner.getValue()).doubleValue();
         if (amount <= 0) {
             JOptionPane.showMessageDialog(frame, "Please enter a positive number.", "Invalid Input", JOptionPane.ERROR_MESSAGE);
             return;
@@ -163,13 +169,30 @@ public class CoffeeApp {
         resultArea.setText(formatRecipe(recipe));
     }
 
+    private void clearForm() {
+        styleBox.setSelectedIndex(0);
+        cupsMode.setSelected(true);
+        amountSpinner.setValue(1.0);
+        updateAmountLabel();
+        resultArea.setText("Select a brew style and enter a value to see the recipe.");
+    }
+
     private String formatRecipe(CoffeeRecipe recipe) {
         return String.format(
-                "Style: %s%nCoffee: %.1f g%nWater: %.1f ml%nEstimated cups: %.2f",
+                "Style: %s%n"
+                        + "Ratio: %s%n"
+                        + "Coffee: %s g%n"
+                        + "Water: %s ml%n"
+                        + "Estimated cups: %s",
                 recipe.getStyle().getLabel(),
-                recipe.getCoffeeGrams(),
-                recipe.getWaterMl(),
-                recipe.getCups()
+                ratioLabel(recipe.getStyle()),
+                numberFormat.format(recipe.getCoffeeGrams()),
+                numberFormat.format(recipe.getWaterMl()),
+                numberFormat.format(recipe.getCups())
         );
+    }
+
+    private String ratioLabel(BrewStyle style) {
+        return "1:" + numberFormat.format(style.getCoffeeToWaterRatio());
     }
 }
